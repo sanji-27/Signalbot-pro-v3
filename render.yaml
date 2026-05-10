@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: signalbot-pro
+    runtime: python
+    buildCommand: pip install --prefer-binary -r requirements.txt
+    startCommand: gunicorn main:flask_app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: MIN_CONFIDENCE
+        value: "75"
+      - key: ELITE_CONFIDENCE
+        value: "88"
+      - key: HIGH_QUALITY_ONLY
+        value: "true"
+      - key: MAX_RISK_PER_TRADE
+        value: "1.0"
+      - key: MAX_DAILY_RISK
+        value: "3.0"
+      - key: MAX_CONSECUTIVE_LOSSES
+        value: "2"
+      - key: CAPITAL
+        value: "1000"
+      - key: SCAN_EXPIRIES
+        value: "5,10,15,20,30,40,60"
+      - key: FLASK_PORT
+        value: "10000"
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: LOG_TO_FILE
+        value: "false"
+      - key: DB_PATH
+        value: "signals.db"

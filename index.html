@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>SureShot Pro — Multi-Agent Signal Bot</title>
+<style>
+  :root{
+    --bg:#07080d;--card:#0d1117;--border:#1c2333;--text:#e2e8f0;--dim:#64748b;
+    --muted:#475569;--green:#22c55e;--red:#ef4444;--yellow:#f59e0b;--blue:#3b82f6;
+    --purple:#a855f7;--cyan:#06b6d4;--accent:#38bdf8;
+    --green-bg:#052e16;--red-bg:#1c0a0a;--yellow-bg:#1c1000;
+    --card-border:1px solid var(--border);
+    --radius:12px;--radius-sm:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh;padding-bottom:80px;}
+  
+  /* ── Top Bar ── */
+  .topbar{background:var(--card);border-bottom:var(--card-border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;backdrop-filter:blur(12px);}
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,#0ea5e9,#7c3aed);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .logo-text{font-weight:700;font-size:15px;letter-spacing:.5px;}
+  .logo-sub{font-size:9px;color:var(--dim);letter-spacing:2px;}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+  .status-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--dim);}
+
+  /* ── Nav ── */
+  .nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:var(--card-border);display:flex;z-index:100;padding:4px 0 max(4px,env(safe-area-inset-bottom));}
+  .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;cursor:pointer;border:none;background:none;color:var(--dim);font-size:9px;letter-spacing:.5px;transition:color .2s;}
+  .nav-btn.active{color:var(--accent);}
+  .nav-btn .icon{font-size:20px;}
+  
+  /* ── Content ── */
+  .pane{display:none;padding:14px;}
+  .pane.active{display:block;}
+  
+  /* ── Cards ── */
+  .card{background:var(--card);border:var(--card-border);border-radius:var(--radius);padding:14px;margin-bottom:12px;}
+  .card-title{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--dim);margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  
+  /* ── Stats Grid ── */
+  .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px;}
+  .stat-box{background:var(--card);border:var(--card-border);border-radius:var(--radius-sm);padding:12px;text-align:center;}
+  .stat-val{font-size:22px;font-weight:800;line-height:1;}
+  .stat-lbl{font-size:8px;color:var(--dim);letter-spacing:1.5px;margin-top:4px;}
+  .stat-box.green{border-color:#22c55e30;background:#052e1610;}
+  .stat-box.red{border-color:#ef444430;background:#1c0a0a10;}
+  .stat-box.blue{border-color:#3b82f630;background:#0c1a3010;}
+  .stat-box.yellow{border-color:#f59e0b30;background:#1c100010;}
+
+  /* ── Signal Card ── */
+  .signal-item{border:var(--card-border);border-radius:var(--radius);padding:12px;margin-bottom:10px;cursor:pointer;transition:border-color .2s;}
+  .signal-item.call{border-left:3px solid var(--green);background:linear-gradient(135deg,var(--card),#052e1605);}
+  .signal-item.put{border-left:3px solid var(--red);background:linear-gradient(135deg,var(--card),#1c0a0a05);}
+  .signal-item.elite{border-top:1px solid var(--yellow)!important;}
+  .sig-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+  .sig-asset{font-size:14px;font-weight:700;color:var(--text);}
+  .sig-dir{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;}
+  .sig-dir.call{background:var(--green-bg);color:var(--green);border:1px solid #22c55e30;}
+  .sig-dir.put{background:var(--red-bg);color:var(--red);border:1px solid #ef444430;}
+  .sig-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;}
+  .badge{font-size:8px;padding:2px 8px;border-radius:10px;background:#ffffff08;color:var(--dim);border:1px solid var(--border);}
+  .badge.elite{background:#1c100020;color:var(--yellow);border-color:#f59e0b30;}
+  .badge.high{background:#0c1a3020;color:var(--blue);border-color:#3b82f630;}
+  .sig-conf{display:flex;align-items:center;gap:8px;}
+  .conf-bar{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .conf-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--blue),var(--green));}
+  .conf-fill.elite{background:linear-gradient(90deg,var(--yellow),var(--green));}
+  .conf-fill.high{background:linear-gradient(90deg,var(--blue),var(--cyan));}
+  .conf-pct{font-size:13px;font-weight:800;min-width:44px;text-align:right;}
+  .conf-pct.elite{color:var(--yellow);}
+  .conf-pct.high{color:var(--cyan);}
+  .conf-pct.standard{color:var(--blue);}
+  .sig-levels{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;}
+  .level-item .lbl{font-size:7px;color:var(--dim);}
+  .level-item .val{font-size:10px;font-weight:700;font-family:monospace;}
+  .sig-reasons{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+  .reason-row{font-size:9px;color:var(--dim);display:flex;align-items:flex-start;gap:5px;margin-bottom:3px;}
+  .reason-row::before{content:"✓";color:var(--green);flex-shrink:0;font-weight:700;}
+  
+  /* ── Agent Status ── */
+  .agents-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+  .agent-card{background:#0d1117;border:var(--card-border);border-radius:var(--radius-sm);padding:10px;}
+  .agent-name{font-size:8px;font-weight:700;letter-spacing:1.5px;color:var(--dim);margin-bottom:4px;}
+  .agent-status{font-size:10px;font-weight:600;display:flex;align-items:center;gap:5px;}
+  .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .dot.done{background:var(--green);}
+  .dot.running{background:var(--yellow);animation:pulse .8s infinite;}
+  .dot.error{background:var(--red);}
+  .dot.idle{background:var(--muted);}
+  
+  /* ── Risk Dashboard ── */
+  .risk-meter{margin:10px 0;}
+  .risk-track{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:6px;}
+  .risk-fill{height:100%;border-radius:4px;transition:width .5s;}
+  .risk-item{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);}
+  .risk-item:last-child{border-bottom:none;}
+  .risk-key{font-size:10px;color:var(--dim);}
+  .risk-val{font-size:11px;font-weight:700;}
+  .halt-banner{background:var(--red-bg);border:1px solid #ef444440;border-radius:var(--radius-sm);padding:12px;text-align:center;margin-bottom:12px;}
+  .halt-title{color:var(--red);font-weight:700;font-size:13px;margin-bottom:4px;}
+  .halt-detail{color:var(--dim);font-size:10px;}
+  
+  /* ── Scan Controls ── */
+  .scan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;}
+  .scan-btn{background:var(--card);border:var(--card-border);border-radius:var(--radius-sm);padding:10px 4px;cursor:pointer;color:var(--text);font-size:10px;font-weight:700;text-align:center;transition:all .2s;}
+  .scan-btn:hover,.scan-btn:active{border-color:var(--accent);color:var(--accent);}
+  .scan-btn .expiry{font-size:14px;font-weight:800;color:var(--accent);}
+  
+  /* ── Performance Chart ── */
+  .perf-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .perf-day{font-size:9px;color:var(--dim);min-width:55px;}
+  .perf-bar-wrap{flex:1;height:18px;background:var(--border);border-radius:3px;overflow:hidden;position:relative;}
+  .perf-bar-w{height:100%;background:var(--green-bg);display:flex;align-items:center;padding-left:4px;}
+  .perf-bar-l{position:absolute;top:0;right:0;height:100%;background:var(--red-bg);}
+  .perf-label{font-size:8px;color:var(--dim);min-width:40px;text-align:right;}
+  
+  /* ── Setup ── */
+  .setup-item{margin-bottom:12px;}
+  .setup-label{font-size:9px;color:var(--dim);margin-bottom:4px;}
+  .setup-input{width:100%;background:#0a0f1a;border:var(--card-border);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text);font-size:12px;font-family:monospace;outline:none;}
+  .setup-input:focus{border-color:var(--accent);}
+  .btn{width:100%;padding:12px;border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.5px;transition:opacity .2s;}
+  .btn:hover{opacity:.85;}
+  .btn-primary{background:linear-gradient(135deg,#0ea5e9,#6366f1);color:#fff;}
+  .btn-success{background:linear-gradient(135deg,#059669,#10b981);color:#fff;}
+  .btn-danger{background:linear-gradient(135deg,#dc2626,#ef4444);color:#fff;}
+  .btn-sm{padding:6px 14px;font-size:9px;font-weight:700;border:none;border-radius:6px;cursor:pointer;}
+  .info-box{background:#0a0f1a;border-left:2px solid var(--accent);padding:10px 12px;border-radius:0 8px 8px 0;font-size:10px;color:var(--dim);line-height:1.8;margin-bottom:12px;}
+  
+  /* ── Empty State ── */
+  .empty{text-align:center;padding:40px 20px;color:var(--dim);}
+  .empty-icon{font-size:40px;margin-bottom:10px;}
+  .empty-text{font-size:12px;line-height:1.8;}
+  
+  /* ── Misc ── */
+  .tag{display:inline-flex;align-items:center;gap:4px;font-size:8px;padding:3px 8px;border-radius:10px;font-weight:600;letter-spacing:.5px;}
+  .tag.win{background:var(--green-bg);color:var(--green);}
+  .tag.loss{background:var(--red-bg);color:var(--red);}
+  .tag.pending{background:#0c1a30;color:var(--blue);}
+  .divider{border:none;border-top:1px solid var(--border);margin:10px 0;}
+  .text-green{color:var(--green);}
+  .text-red{color:var(--red);}
+  .text-yellow{color:var(--yellow);}
+  .text-blue{color:var(--blue);}
+  .text-dim{color:var(--dim);}
+  .mono{font-family:monospace;}
+  .spin{display:inline-block;animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .refresh-note{font-size:8px;color:var(--muted);text-align:right;margin-top:-8px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-icon">🎯</div>
+    <div>
+      <div class="logo-text">SureShot Pro</div>
+      <div class="logo-sub">MULTI-AGENT · 25-GATE SYSTEM</div>
+    </div>
+  </div>
+  <div class="status-row">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Connecting…</span>
+  </div>
+</div>
+
+<!-- Panes -->
+<div class="pane active" id="pane0"><!-- Signals --></div>
+<div class="pane" id="pane1"><!-- Scanner --></div>
+<div class="pane" id="pane2"><!-- Performance --></div>
+<div class="pane" id="pane3"><!-- Risk --></div>
+<div class="pane" id="pane4"><!-- Setup --></div>
+
+<!-- Bottom Nav -->
+<nav class="nav">
+  <button class="nav-btn active" id="nav0" onclick="go(0)">
+    <span class="icon">📡</span>SIGNALS
+  </button>
+  <button class="nav-btn" id="nav1" onclick="go(1)">
+    <span class="icon">⚡</span>SCANNER
+  </button>
+  <button class="nav-btn" id="nav2" onclick="go(2)">
+    <span class="icon">📊</span>STATS
+  </button>
+  <button class="nav-btn" id="nav3" onclick="go(3)">
+    <span class="icon">🛡</span>RISK
+  </button>
+  <button class="nav-btn" id="nav4" onclick="go(4)">
+    <span class="icon">⚙️</span>SETUP
+  </button>
+</nav>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const S = { tab: 0, signals: [], stats: {}, risk: {}, agents: {}, health: {} };
+let autoRefresh = null;
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function go(n) {
+  S.tab = n;
+  document.querySelectorAll('.pane').forEach((p, i) => p.classList.toggle('active', i === n));
+  document.querySelectorAll('.nav-btn').forEach((b, i) => b.classList.toggle('active', i === n));
+  renderTab(n);
+}
+
+// ── API Calls ──────────────────────────────────────────────────────────────
+async function api(path) {
+  try {
+    const r = await fetch(path);
+    return await r.json();
+  } catch(e) { return null; }
+}
+
+async function refreshAll() {
+  const [health, signals, stats, risk, agents] = await Promise.all([
+    api('/api/health'),
+    api('/api/signals?limit=30'),
+    api('/api/stats'),
+    api('/api/risk'),
+    api('/api/agents'),
+  ]);
+  if (health) {
+    S.health = health;
+    document.getElementById('statusDot').style.background =
+      health.status === 'running' ? 'var(--green)' : 'var(--yellow)';
+    document.getElementById('statusText').textContent =
+      health.status === 'running' ? 'Live' : 'Starting…';
+  }
+  if (signals) S.signals = signals;
+  if (stats)   S.stats   = stats;
+  if (risk)    S.risk    = risk;
+  if (agents)  S.agents  = agents;
+  renderTab(S.tab);
+}
+
+// ── Renderers ──────────────────────────────────────────────────────────────
+function renderTab(n) {
+  if (n === 0) renderSignals();
+  if (n === 1) renderScanner();
+  if (n === 2) renderStats();
+  if (n === 3) renderRisk();
+  if (n === 4) renderSetup();
+}
+
+// ── Signal Card ────────────────────────────────────────────────────────────
+function confColor(c) {
+  if (c >= 88) return 'elite';
+  if (c >= 82) return 'high';
+  return 'standard';
+}
+function tierColor(t) {
+  return { ELITE: 'var(--yellow)', HIGH: 'var(--cyan)', STANDARD: 'var(--blue)', WEAK: 'var(--muted)' }[t] || 'var(--dim)';
+}
+function outcomeTag(o) {
+  if (!o || o === 'PENDING') return '<span class="tag pending">⏳ PENDING</span>';
+  if (o === 'WIN')  return '<span class="tag win">✅ WIN</span>';
+  if (o === 'LOSS') return '<span class="tag loss">❌ LOSS</span>';
+  return `<span class="tag">${o}</span>`;
+}
+function sigCard(s, showOutcome=true) {
+  const dir = s.direction || 'CALL';
+  const conf = s.confidence || 0;
+  const tier = s.tier || 'STANDARD';
+  const cc = confColor(conf);
+  const reasons = (s.key_reasons || []).slice(0, 3);
+  const ts = s.timestamp ? new Date(s.timestamp + 'Z').toLocaleTimeString() : '--';
+
+  return `
+  <div class="signal-item ${dir.toLowerCase()} ${tier === 'ELITE' ? 'elite' : ''}" onclick="showDetail(${s.id})">
+    <div class="sig-header">
+      <div>
+        <div class="sig-asset">${s.asset_name || s.asset}</div>
+        <div class="text-dim" style="font-size:8px;margin-top:2px">${ts} · ${s.expiry}min</div>
+      </div>
+      <div style="text-align:right">
+        <div class="sig-dir ${dir.toLowerCase()}">${dir === 'CALL' ? '📈 CALL' : '📉 PUT'}</div>
+        ${showOutcome ? '<div style="margin-top:4px">' + outcomeTag(s.outcome) + '</div>' : ''}
+      </div>
+    </div>
+    <div class="sig-meta">
+      <span class="badge ${cc}">${tier}</span>
+      <span class="badge">${s.asset_type || 'forex'}</span>
+      <span class="badge">${s.gates_passed || 0}/${s.gates_total || 25} gates</span>
+      <span class="badge">${(s.regime || '').toUpperCase()}</span>
+    </div>
+    <div class="sig-conf">
+      <div class="conf-bar"><div class="conf-fill ${cc}" style="width:${conf}%"></div></div>
+      <div class="conf-pct ${cc}">${conf.toFixed(1)}%</div>
+    </div>
+    ${reasons.length ? `
+    <div class="sig-reasons">
+      ${reasons.map(r => `<div class="reason-row">${r}</div>`).join('')}
+    </div>` : ''}
+    <div class="sig-levels">
+      <div class="level-item"><div class="lbl">📌 ENTRY</div><div class="val mono text-blue">${(s.entry_price||0).toFixed(5)}</div></div>
+      <div class="level-item"><div class="lbl">🎯 TP1</div><div class="val mono text-green">${(s.tp1||0).toFixed(5)}</div></div>
+      <div class="level-item"><div class="lbl">🛡 SL</div><div class="val mono text-red">${(s.stop_loss||0).toFixed(5)}</div></div>
+    </div>
+  </div>`;
+}
+
+// ── Pane 0: Signals ────────────────────────────────────────────────────────
+function renderSignals() {
+  const p = document.getElementById('pane0');
+  const today = S.stats.today || {};
+  const sigs  = S.signals || [];
+  const elite = sigs.filter(s => s.tier === 'ELITE');
+  const high  = sigs.filter(s => s.tier === 'HIGH');
+
+  let h = `
+  <div class="stats-grid">
+    <div class="stat-box blue">
+      <div class="stat-val text-blue">${today.total_signals || 0}</div>
+      <div class="stat-lbl">TODAY'S SIGNALS</div>
+    </div>
+    <div class="stat-box yellow">
+      <div class="stat-val text-yellow">${elite.length + high.length}</div>
+      <div class="stat-lbl">HIGH QUALITY</div>
+    </div>
+    <div class="stat-box green">
+      <div class="stat-val text-green">${today.wins || 0}</div>
+      <div class="stat-lbl">WINS ✅</div>
+    </div>
+    <div class="stat-box red">
+      <div class="stat-val text-red">${today.losses || 0}</div>
+      <div class="stat-lbl">LOSSES ❌</div>
+    </div>
+  </div>
+  <div class="refresh-note">Auto-refresh every 30s</div>`;
+
+  if (!sigs.length) {
+    h += `<div class="empty"><div class="empty-icon">📡</div><div class="empty-text">No signals yet.<br>Scans run automatically every 5–60 min.<br>Use the Scanner tab to trigger manually.</div></div>`;
+  } else {
+    if (elite.length) {
+      h += `<div class="card-title" style="color:var(--yellow)">🏆 ELITE SIGNALS (${elite.length})</div>`;
+      elite.forEach(s => h += sigCard(s));
+    }
+    if (high.length) {
+      h += `<div class="card-title" style="color:var(--cyan)">⭐ HIGH QUALITY (${high.length})</div>`;
+      high.slice(0, 5).forEach(s => h += sigCard(s));
+    }
+    const rest = sigs.filter(s => s.tier !== 'ELITE' && s.tier !== 'HIGH');
+    if (rest.length) {
+      h += `<div class="card-title">📊 ALL SIGNALS</div>`;
+      rest.slice(0, 10).forEach(s => h += sigCard(s));
+    }
+  }
+  p.innerHTML = h;
+}
+
+// ── Pane 1: Scanner ────────────────────────────────────────────────────────
+function renderScanner() {
+  const p = document.getElementById('pane1');
+  const ag = S.agents;
+  const scans = ag.last_scans || {};
+  const expiries = [5, 10, 15, 20, 30, 40, 60];
+
+  function agentDot(name) {
+    const a = ag.agents || {};
+    const st = (a[name] || {}).status || 'idle';
+    return `<div class="dot ${st}"></div>`;
+  }
+
+  let h = `
+  <div class="card">
+    <div class="card-title">⚡ TRIGGER MANUAL SCAN</div>
+    <div class="scan-grid">
+      ${expiries.map(e => `
+        <div class="scan-btn" onclick="triggerScan(${e})">
+          <div class="expiry">${e}</div>
+          <div style="font-size:8px;color:var(--dim)">MIN</div>
+        </div>`).join('')}
+    </div>
+    <div style="font-size:9px;color:var(--dim);text-align:center">Tap any expiry to scan all assets now</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🧠 AGENT STATUS</div>
+    <div class="agents-grid">
+      ${['data','technical','regime','risk','oracle'].map(name => {
+        const a = (ag.agents || {})[name] || {};
+        const st = a.status || 'idle';
+        const labels = {data:'DATA AGENT',technical:'TECHNICAL',regime:'REGIME',risk:'RISK MANAGER',oracle:'ORACLE'};
+        const icons  = {data:'📥',technical:'📐',regime:'🌡',risk:'🛡',oracle:'🔮'};
+        return `
+        <div class="agent-card">
+          <div class="agent-name">${icons[name]} ${labels[name]}</div>
+          <div class="agent-status">
+            <div class="dot ${st}"></div>
+            <span>${st.toUpperCase()}</span>
+          </div>
+        </div>`;
+      }).join('')}
+      <div class="agent-card">
+        <div class="agent-name">📊 SCANS</div>
+        <div class="agent-status">
+          <div class="dot done"></div>
+          <span>${ag.scan_count || 0} total</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⏱ LAST SCAN TIMES</div>
+    ${expiries.map(e => {
+      const t = scans[e] ? new Date(scans[e] + 'Z').toLocaleTimeString() : 'never';
+      return `<div class="risk-item">
+        <div class="risk-key">${e}min expiry</div>
+        <div class="risk-val text-dim">${t}</div>
+      </div>`;
+    }).join('')}
+  </div>
+  <div id="scanResult"></div>`;
+
+  p.innerHTML = h;
+}
+
+async function triggerScan(expiry) {
+  document.getElementById('scanResult').innerHTML = `
+    <div class="card" style="text-align:center;padding:20px">
+      <div style="font-size:24px" class="spin">⟳</div>
+      <div style="margin-top:8px;color:var(--dim);font-size:11px">Scanning all assets (${expiry}min)…</div>
+    </div>`;
+  try {
+    const r = await fetch(`/api/scan/now/${expiry}`, {method:'POST'});
+    const data = await r.json();
+    document.getElementById('scanResult').innerHTML = `
+      <div class="card" style="text-align:center;padding:16px">
+        <div style="color:var(--green);font-size:13px;font-weight:700">✅ Scan started!</div>
+        <div style="color:var(--dim);font-size:10px;margin-top:4px">${data.message}</div>
+        <div style="color:var(--muted);font-size:9px;margin-top:4px">Signals will appear in the Signals tab</div>
+      </div>`;
+    setTimeout(() => { S.tab === 0 ? refreshAll() : null; }, 30000);
+  } catch(e) {
+    document.getElementById('scanResult').innerHTML = `<div class="card" style="color:var(--red);text-align:center;padding:12px">Error: ${e.message}</div>`;
+  }
+}
+
+// ── Pane 2: Stats ──────────────────────────────────────────────────────────
+function renderStats() {
+  const p = document.getElementById('pane2');
+  const overall = S.stats.overall || {};
+  const weekly  = S.stats.weekly  || [];
+  const today   = S.stats.today   || {};
+
+  const wr = overall.win_rate || 0;
+  const total = overall.total || 0;
+  const wins = overall.wins || 0;
+  const losses = overall.losses || 0;
+
+  let h = `
+  <div class="card">
+    <div class="card-title">📊 ALL-TIME PERFORMANCE</div>
+    <div class="stats-grid">
+      <div class="stat-box blue"><div class="stat-val text-blue">${total}</div><div class="stat-lbl">TOTAL TRADES</div></div>
+      <div class="stat-box ${wr >= 60 ? 'green' : wr >= 50 ? 'yellow' : 'red'}">
+        <div class="stat-val ${wr >= 60 ? 'text-green' : wr >= 50 ? 'text-yellow' : 'text-red'}">${wr.toFixed(1)}%</div>
+        <div class="stat-lbl">WIN RATE</div>
+      </div>
+      <div class="stat-box green"><div class="stat-val text-green">${wins}</div><div class="stat-lbl">WINS ✅</div></div>
+      <div class="stat-box red"><div class="stat-val text-red">${losses}</div><div class="stat-lbl">LOSSES ❌</div></div>
+    </div>
+    <div class="risk-meter">
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--dim);margin-bottom:4px">
+        <span>WIN RATE</span><span>${wr.toFixed(1)}%</span>
+      </div>
+      <div class="risk-track">
+        <div class="risk-fill" style="width:${wr}%;background:${wr >= 60 ? 'var(--green)' : wr >= 50 ? 'var(--yellow)' : 'var(--red)'}"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📅 TODAY — ${today.date || '--'}</div>
+    <div class="risk-item"><div class="risk-key">Signals</div><div class="risk-val">${today.total_signals || 0}</div></div>
+    <div class="risk-item"><div class="risk-key">Avg Confidence</div><div class="risk-val text-blue">${(today.avg_confidence || 0).toFixed(1)}%</div></div>
+    <div class="risk-item"><div class="risk-key">Wins</div><div class="risk-val text-green">${today.wins || 0}</div></div>
+    <div class="risk-item"><div class="risk-key">Losses</div><div class="risk-val text-red">${today.losses || 0}</div></div>
+    <div class="risk-item"><div class="risk-key">Pending</div><div class="risk-val text-yellow">${today.pending || 0}</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📈 7-DAY HISTORY</div>
+    ${weekly.slice(0, 7).map(d => {
+      const w = d.wins || 0, l = d.losses || 0, tot = w + l || 1;
+      const wr2 = (w / tot * 100).toFixed(0);
+      return `<div class="perf-row">
+        <div class="perf-day">${d.date.slice(5)}</div>
+        <div class="perf-bar-wrap">
+          <div class="perf-bar-w" style="width:${w/tot*100}%">
+            ${w ? `<span style="font-size:7px;color:var(--green)">${w}W</span>` : ''}
+          </div>
+        </div>
+        <div class="perf-label">${wr2}% (${d.total_signals||0})</div>
+      </div>`;
+    }).join('')}
+    ${!weekly.length ? '<div class="text-dim" style="text-align:center;padding:10px;font-size:10px">No history yet</div>' : ''}
+  </div>
+
+  <!-- Signal log -->
+  <div class="card">
+    <div class="card-title">📋 RECENT SIGNALS LOG</div>
+    ${(S.signals || []).slice(0, 20).map(s => `
+      <div class="risk-item">
+        <div>
+          <div style="font-size:10px;font-weight:700">${s.asset}</div>
+          <div style="font-size:8px;color:var(--dim)">${(s.timestamp||'').slice(11,16)} · ${s.expiry}min</div>
+        </div>
+        <div style="text-align:right;display:flex;align-items:center;gap:6px">
+          <span style="font-size:10px;font-weight:700;color:${s.direction==='CALL'?'var(--green)':'var(--red)'}">${s.direction}</span>
+          ${outcomeTag(s.outcome)}
+        </div>
+      </div>`).join('')}
+    ${!(S.signals||[]).length ? '<div class="text-dim" style="text-align:center;padding:12px;font-size:10px">No signals yet</div>' : ''}
+  </div>`;
+  p.innerHTML = h;
+}
+
+// ── Pane 3: Risk ───────────────────────────────────────────────────────────
+function renderRisk() {
+  const p = document.getElementById('pane3');
+  const r = S.risk || {};
+  const halted  = r.halted || false;
+  const consec  = r.consecutive_losses || 0;
+  const maxC    = r.max_consecutive || 2;
+  const dLosses = r.daily_losses || 0;
+  const dWins   = r.daily_wins   || 0;
+  const dRisk   = r.daily_risk_used || 0;
+  const maxDR   = r.max_daily_risk || 3;
+  const riskPct = Math.min(dRisk / maxDR * 100, 100);
+  const consecPct = Math.min(consec / maxC * 100, 100);
+
+  let h = '';
+
+  if (halted) {
+    h += `<div class="halt-banner">
+      <div class="halt-title">🚨 TRADING HALTED</div>
+      <div class="halt-detail">${r.halt_reason || 'Risk limit reached'}</div>
+      <button class="btn btn-success btn-sm" style="margin-top:10px" onclick="resumeTrading()">✅ Resume Trading</button>
+    </div>`;
+  }
+
+  h += `
+  <div class="card">
+    <div class="card-title">🛡 RISK DASHBOARD</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div style="font-size:28px">${halted ? '🚨' : consec >= maxC - 1 ? '⚠️' : '✅'}</div>
+      <div>
+        <div style="font-weight:700;font-size:13px">${halted ? 'HALTED' : 'TRADING ACTIVE'}</div>
+        <div style="font-size:9px;color:var(--dim)">${halted ? r.halt_reason : 'All risk checks passing'}</div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-bottom:4px">
+        <span>Daily Risk Used</span><span>${dRisk.toFixed(1)}% / ${maxDR}%</span>
+      </div>
+      <div class="risk-track">
+        <div class="risk-fill" style="width:${riskPct}%;background:${riskPct>80?'var(--red)':riskPct>60?'var(--yellow)':'var(--green)'}"></div>
+      </div>
+    </div>
+
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--dim);margin-bottom:4px">
+        <span>Consecutive Losses</span><span>${consec} / ${maxC}</span>
+      </div>
+      <div class="risk-track">
+        <div class="risk-fill" style="width:${consecPct}%;background:${consecPct>=100?'var(--red)':consecPct>=50?'var(--yellow)':'var(--green)'}"></div>
+      </div>
+    </div>
+
+    <div class="risk-item"><div class="risk-key">Daily Wins</div><div class="risk-val text-green">${dWins}</div></div>
+    <div class="risk-item"><div class="risk-key">Daily Losses</div><div class="risk-val text-red">${dLosses}</div></div>
+    <div class="risk-item"><div class="risk-key">Daily Signals</div><div class="risk-val">${r.daily_signals || 0}</div></div>
+    <div class="risk-item"><div class="risk-key">Capital</div><div class="risk-val text-blue">$${(r.capital||0).toLocaleString()}</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📜 RISK RULES</div>
+    <div class="info-box">
+      <strong style="color:var(--accent)">Non-Negotiable Rules:</strong><br>
+      ✅ Max ${r.max_consecutive||2} consecutive losses → auto-halt<br>
+      ✅ Max daily risk: ${maxDR}% of capital<br>
+      ✅ Min confidence: requires 60%+ gates passed<br>
+      ✅ Ranging markets filtered automatically<br>
+      ✅ Position size scales with confidence
+    </div>
+    ${halted ? `<button class="btn btn-success" onclick="resumeTrading()">✅ Resume Trading</button>` : ''}
+  </div>
+
+  <!-- Update outcomes -->
+  <div class="card">
+    <div class="card-title">📋 UPDATE SIGNAL OUTCOMES</div>
+    <div style="font-size:10px;color:var(--dim);margin-bottom:10px">Click a signal below to mark outcome:</div>
+    ${(S.signals||[]).filter(s=>s.outcome==='PENDING').slice(0,5).map(s=>`
+      <div class="risk-item">
+        <div>
+          <div style="font-size:10px;font-weight:700">${s.asset} ${s.direction}</div>
+          <div style="font-size:8px;color:var(--dim)">${(s.timestamp||'').slice(11,16)} · ${s.expiry}min · ${s.confidence}%</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" style="background:var(--green-bg);color:var(--green);border:1px solid #22c55e30" onclick="markOutcome(${s.id},'WIN')">✅ WIN</button>
+          <button class="btn-sm" style="background:var(--red-bg);color:var(--red);border:1px solid #ef444430" onclick="markOutcome(${s.id},'LOSS')">❌ LOSS</button>
+        </div>
+      </div>`).join('')}
+    ${!(S.signals||[]).filter(s=>s.outcome==='PENDING').length ? '<div style="font-size:10px;color:var(--muted);text-align:center;padding:10px">No pending signals</div>' : ''}
+  </div>`;
+
+  p.innerHTML = h;
+}
+
+async function resumeTrading() {
+  await fetch('/api/risk/resume', {method:'POST'});
+  await refreshAll();
+}
+
+async function markOutcome(id, outcome) {
+  await fetch(`/api/signal/${id}/outcome`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({outcome})
+  });
+  await refreshAll();
+}
+
+// ── Pane 4: Setup ──────────────────────────────────────────────────────────
+function renderSetup() {
+  const p = document.getElementById('pane4');
+  const h = S.health || {};
+
+  p.innerHTML = `
+  <div class="card">
+    <div class="card-title">📱 TELEGRAM SETUP</div>
+    <div class="info-box">
+      <strong style="color:var(--cyan)">Step 1:</strong> Search @BotFather → /newbot → copy token<br>
+      <strong style="color:var(--cyan)">Step 2:</strong> Search @userinfobot → get your Chat ID<br>
+      <strong style="color:var(--cyan)">Step 3:</strong> Add to .env file:<br>
+      <code style="color:var(--yellow)">TELEGRAM_BOT_TOKEN=your_token<br>
+      TELEGRAM_CHAT_ID=your_chat_id</code><br>
+      <strong style="color:var(--cyan)">Step 4:</strong> Restart bot
+    </div>
+    <button class="btn btn-primary" onclick="testTelegram()" style="margin-bottom:8px">📤 TEST TELEGRAM</button>
+    <div id="tgResult"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ CONFIGURATION</div>
+    <div class="info-box">
+      Edit <code style="color:var(--yellow)">.env</code> file to configure:<br>
+      • <code>MIN_CONFIDENCE=75</code> — Minimum signal quality<br>
+      • <code>ELITE_CONFIDENCE=88</code> — Elite tier threshold<br>
+      • <code>HIGH_QUALITY_ONLY=true</code> — Only send HIGH/ELITE<br>
+      • <code>MAX_RISK_PER_TRADE=1.0</code> — % per trade<br>
+      • <code>MAX_DAILY_RISK=3.0</code> — Daily limit<br>
+      • <code>CAPITAL=1000</code> — Trading capital<br>
+      • <code>SCAN_EXPIRIES=5,10,15,20,30,40,60</code>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🚀 DEPLOYMENT (FREE)</div>
+    <div class="info-box">
+      <strong style="color:var(--green)">Railway.app (recommended):</strong><br>
+      1. Push to GitHub<br>
+      2. Connect Railway → Deploy<br>
+      3. Add environment variables<br>
+      4. Auto-deploys on push<br><br>
+      <strong style="color:var(--blue)">Render.com:</strong><br>
+      1. New Web Service → connect repo<br>
+      2. Build: <code>pip install -r requirements.txt</code><br>
+      3. Start: <code>gunicorn main:flask_app</code><br><br>
+      <strong style="color:var(--yellow)">Replit:</strong><br>
+      1. Import repo → set secrets<br>
+      2. Run: <code>python main.py</code>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">ℹ️ BOT STATUS</div>
+    <div class="risk-item"><div class="risk-key">Status</div><div class="risk-val text-green">${h.status || '--'}</div></div>
+    <div class="risk-item"><div class="risk-key">Uptime</div><div class="risk-val">${fmtUptime(h.uptime_seconds||0)}</div></div>
+    <div class="risk-item"><div class="risk-key">Total Scans</div><div class="risk-val">${h.scan_count||0}</div></div>
+    <div class="risk-item"><div class="risk-key">Total Signals</div><div class="risk-val">${h.signal_count||0}</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚠️ DISCLAIMER</div>
+    <div style="font-size:9px;color:var(--muted);line-height:1.8">
+      SureShot Pro is for <strong>educational and analytical purposes only</strong>.
+      Even high-confidence signals carry risk. Binary options and forex trading
+      involve significant risk of capital loss. Always test on a demo account
+      first. Never risk money you cannot afford to lose.
+    </div>
+  </div>`;
+}
+
+async function testTelegram() {
+  document.getElementById('tgResult').innerHTML = '<div style="font-size:10px;color:var(--dim);padding:8px 0">Sending…</div>';
+  const r = await fetch('/api/telegram/test', {method:'POST'});
+  const data = await r.json();
+  document.getElementById('tgResult').innerHTML = `<div style="font-size:10px;color:${data.success?'var(--green)':'var(--red)'};padding:6px 0">${data.success ? '✅ '+data.message : '❌ '+data.message}</div>`;
+}
+
+function fmtUptime(seconds) {
+  if (!seconds) return '--';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+
+function showDetail(id) {
+  const sig = (S.signals||[]).find(s => s.id === id);
+  if (!sig) return;
+  // Future: expand detail view
+  console.log('Signal detail:', sig);
+}
+
+// ── Refresh Loop ────────────────────────────────────────────────────────────
+refreshAll();
+autoRefresh = setInterval(refreshAll, 30000);
+</script>
+</body>
+</html>
